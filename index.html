@@ -219,7 +219,7 @@
     </div>
 
     <!-- Поле поиска -->
-    <input type="text" id="searchInput" placeholder="Поиск..." onkeyup="searchTable()">
+    <input type="text" id="searchInput" placeholder="Search..." onkeyup="searchTable()">
 
     <div id="tables"></div>
 
@@ -227,7 +227,7 @@
     <div id="modal" class="modal">
         <div class="modal-content">
             <p>Invalid file type. Please select a file with the extension .db</p>
-            <button id="modal_ok">Ок</button>
+            <button id="modal_ok">Ok</button>
         </div>
     </div>
 
@@ -430,7 +430,7 @@
                 ipCache.set(ip, countryCode);
                 return countryCode;
             } catch (error) {
-                console.error('Ошибка при получении кода страны:', error);
+                console.error('Error getting country code:', error);
                 return 'un';
             }
         }
