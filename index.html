@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>SQLite web reader</title>
+    <style>
+        body {
+            background-color: #1e1e1e;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #container {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background-color: #1e1e1e;
+            padding-bottom: 20px;
+            padding-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        #drop_zone {
+            border: 3px dashed #555;
+            border-radius: 10px;
+            padding: 50px;
+            text-align: center;
+            width: 80%;
+            margin: 0 auto;
+            transition: background-color 0.3s, border-color 0.3s;
+            cursor: pointer;
+            background-color: #2b2b2b;
+            color: #ccc;
+        }
+
+        #drop_zone.hover {
+            background-color: #333;
+            border-color: #888;
+        }
+
+         #drop_zone:hover {
+            background-color: #333;
+            border-color: #888;
+        }
+
+        table {
+            width: 90%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            background-color: #2b2b2b;
+            color: #fff;
+        }
+
+        th {
+            background-color: #3a3a3a;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        tr:nth-child(even) td {
+            background-color: #2a2a2a;
+        }
+
+        tr:nth-child(odd) td {
+            background-color: #2e2e2e;
+        }
+
+        tr:hover td {
+            background-color: #3a3a3a;
+        }
+
+        h2, h3 {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        /* Анимация появления */
+        .fadeInDown {
+            animation: fadeInDown 0.5s ease-in-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Стили для модального окна */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(30, 30, 30, 0.9);
+        }
+
+        .modal-content {
+            background-color: #2b2b2b;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #444;
+            width: 50%;
+            text-align: center;
+            border-radius: 10px;
+            animation: fadeInDown 0.5s ease-in-out;
+        }
+
+        .modal-content button {
+            padding: 10px 20px;
+            background-color: #555;
+            border: none;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .modal-content button:hover {
+            background-color: #777;
+        }
+
+        /* Стили для флага */
+        .flag {
+            width: 24px;
+            height: 16px;
+            display: inline-block;
+            background-size: cover;
+            margin-left: 5px;
+            vertical-align: middle;
+            border-radius: 3px;
+        }
+
+        /* Улучшение читаемости текста */
+        td {
+            word-wrap: break-word;
+            max-width: 200px;
+        }
+
+        td div {
+            display: flex;
+            align-items: center;
+        }
+
+        td img.flag {
+            margin-left: 5px;
+        }
+
+        /* Стилизация полосы прокрутки */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Стили для поля поиска */
+        #searchInput {
+            width: 80%;
+            padding: 10px;
+            margin: 20px auto;
+            display: block;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background-color: #2b2b2b;
+            color: #fff;
+        }
+
+        #searchInput::placeholder {
+            color: #ccc;
+        }
+
+        /* Адаптивность таблиц */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .table-container table {
+            width: 100%;
+            min-width: 600px; /* Минимальная ширина таблицы */
+        }
+
+    </style>
+    <!-- Подключение библиотеки SQL.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+</head>
+<body>
+
+    <div id="container">
+        <div id="drop_zone">Drag your .db file here or click to select</div>
+        <input type="file" id="file_input" style="display:none;" accept=".db">
+    </div>
+
+    <!-- Поле поиска -->
+    <input type="text" id="searchInput" placeholder="Поиск..." onkeyup="searchTable()">
+
+    <div id="tables"></div>
+
+    <!-- Модальное окно -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <p>Invalid file type. Please select a file with the extension .db</p>
+            <button id="modal_ok">Ок</button>
+        </div>
+    </div>
+
+    <!-- Индикатор загрузки -->
+    <div id="loader" style="display:none; text-align: center;">
+        <p>Loading data, please wait...</p>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('drop_zone');
+        const fileInput = document.getElementById('file_input');
+        const modal = document.getElementById('modal');
+        const modalOk = document.getElementById('modal_ok');
+        const container = document.getElementById('container');
+        const tablesDiv = document.getElementById('tables');
+        const loader = document.getElementById('loader');
+        const searchInput = document.getElementById('searchInput');
+
+        const ipCache = new Map();
+
+        // Обработка клика по зоне дропа
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // Обработка выбора файла через input
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        // Обработка событий drag & drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('hover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('hover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('hover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        async function handleFiles(files) {
+            if (files.length) {
+                const file = files[0];
+
+                // Проверка типа файла
+                if (file.name.endsWith('.db')) {
+                    showLoader();
+                    const reader = new FileReader();
+
+                    reader.onload = function() {
+                        initSqlJs({ locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${filename}` })
+                        .then(async SQL => {
+                            const uints = new Uint8Array(reader.result);
+                            const db = new SQL.Database(uints);
+
+                            // Очистка предыдущего содержимого
+                            tablesDiv.innerHTML = '';
+
+                            // Отображение названия файла базы данных
+                            const dbNameHeading = document.createElement('h2');
+                            dbNameHeading.textContent = `База данных: ${file.name}`;
+                            dbNameHeading.classList.add('fadeInDown');
+                            tablesDiv.appendChild(dbNameHeading);
+
+                            // Получаем список таблиц
+                            const res = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
+                            const tableNames = res[0] ? res[0].values.map(value => value[0]) : [];
+
+                            let delay = 500; // Начальная задержка в миллисекундах
+
+                            for (const tableName of tableNames) {
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                const tableRes = db.exec(`SELECT * FROM "${tableName}"`);
+                                if (tableRes.length) {
+                                    // Контейнер для таблицы и её заголовка
+                                    const tableContainer = document.createElement('div');
+                                    tableContainer.classList.add('table-container');
+
+                                    // Заголовок таблицы
+                                    const tableHeading = document.createElement('h3');
+                                    tableHeading.textContent = `Таблица: ${tableName}`;
+                                    tableHeading.classList.add('fadeInDown');
+                                    tableContainer.appendChild(tableHeading);
+
+                                    // Создание таблицы
+                                    const tableElement = document.createElement('table');
+                                    tableElement.classList.add('fadeInDown');
+
+                                    const thead = document.createElement('thead');
+                                    const headerRow = document.createElement('tr');
+
+                                    // Заголовки столбцов
+                                    tableRes[0].columns.forEach(col => {
+                                        const th = document.createElement('th');
+                                        th.textContent = col;
+                                        headerRow.appendChild(th);
+                                    });
+                                    thead.appendChild(headerRow);
+                                    tableElement.appendChild(thead);
+
+                                    // Тело таблицы
+                                    const tbody = document.createElement('tbody');
+
+                                    // Данные таблицы
+                                    for (const row of tableRes[0].values) {
+                                        const tr = document.createElement('tr');
+                                        const ipPromises = [];
+
+                                        row.forEach((cell, index) => {
+                                            let cellContent = cell !== null ? cell : '';
+
+                                            const td = document.createElement('td');
+
+                                            // Проверка на IP и добавление флага
+                                            if (isValidIP(cellContent)) {
+                                                const cellDiv = document.createElement('div');
+                                                const cellText = document.createElement('span');
+                                                cellText.textContent = cellContent;
+                                                cellDiv.appendChild(cellText);
+
+                                                const ipPromise = getCountryCodeFromIP(cellContent).then(countryCode => {
+                                                    const flagImg = document.createElement('img');
+                                                    flagImg.src = `https://flagcdn.com/24x18/${countryCode}.png`;
+                                                    flagImg.classList.add('flag');
+                                                    cellDiv.appendChild(flagImg);
+                                                });
+                                                ipPromises.push(ipPromise);
+
+                                                td.appendChild(cellDiv);
+                                            } else {
+                                                td.textContent = cellContent;
+                                            }
+
+                                            tr.appendChild(td);
+                                        });
+
+                                        await Promise.all(ipPromises);
+                                        tbody.appendChild(tr);
+                                    }
+
+                                    tableElement.appendChild(tbody);
+                                    tableContainer.appendChild(tableElement);
+                                    tablesDiv.appendChild(tableContainer);
+                                }
+                                delay += 500; // Увеличиваем задержку для следующей таблицы
+                            }
+
+                            hideLoader();
+                        });
+                    };
+
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    showModal();
+                }
+            }
+        }
+
+        // Функция показа модального окна
+        function showModal() {
+            modal.style.display = 'block';
+        }
+
+        // Обработка закрытия модального окна
+        modalOk.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+
+        // Проверка валидности IP адреса
+        function isValidIP(ip) {
+            const regex = /^(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}$/;
+            return regex.test(ip);
+        }
+
+        // Асинхронное получение кода страны по IP с кешированием
+        async function getCountryCodeFromIP(ip) {
+            if (ipCache.has(ip)) {
+                return ipCache.get(ip);
+            }
+            try {
+                const response = await fetch(`https://ipwhois.app/json/${ip}`);
+                const data = await response.json();
+                let countryCode = 'un'; // unknown
+
+                if (data.country_code) {
+                    countryCode = data.country_code.toLowerCase();
+
+                    // Обработка специальных случаев
+                    if (countryCode === 'eu') {
+                        countryCode = 'europeanunion'; // Используем специальный код для ЕС
+                    }
+                }
+
+                ipCache.set(ip, countryCode);
+                return countryCode;
+            } catch (error) {
+                console.error('Ошибка при получении кода страны:', error);
+                return 'un';
+            }
+        }
+
+        // Функции показа и скрытия индикатора загрузки
+        function showLoader() {
+            loader.style.display = 'block';
+        }
+
+        function hideLoader() {
+            loader.style.display = 'none';
+        }
+
+        // Функция поиска по таблицам
+        function searchTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const tables = document.querySelectorAll('.table-container');
+
+            tables.forEach(tableContainer => {
+                const table = tableContainer.querySelector('table');
+                const tr = table.getElementsByTagName('tr');
+                let tableContainsFilter = false;
+
+                for (let i = 1; i < tr.length; i++) {
+                    const td = tr[i].getElementsByTagName('td');
+                    let rowContainsFilter = false;
+                    for (let j = 0; j < td.length; j++) {
+                        if (td[j].innerText.toLowerCase().includes(filter)) {
+                            rowContainsFilter = true;
+                            break;
+                        }
+                    }
+                    tr[i].style.display = rowContainsFilter ? '' : 'none';
+                    if (rowContainsFilter) {
+                        tableContainsFilter = true;
+                    }
+                }
+
+                // Показываем или скрываем весь контейнер таблицы в зависимости от того, есть ли совпадения
+                tableContainer.style.display = tableContainsFilter ? '' : 'none';
+            });
+        }
+    </script>
+
+</body>
+</html>
